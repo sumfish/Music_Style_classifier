@@ -29,21 +29,19 @@ class S_Model(torch.nn.Module):
         #print('level 2:{}'.format(x.shape)) #[N, 32, 128, 130]
         x = self.conv_drop(F.max_pool2d(x, 3))
         #print('level 2.5:{}'.format(x.shape)) #[N, 32, 42, 43]
-        '''
         #2
         x = self.relu(self.conv3(x))
         x = self.relu(self.conv4(x))
-        print('level 4:{}'.format(x.shape)) #[N, 64, 42, 43]
+        #print('level 4:{}'.format(x.shape)) #[N, 64, 42, 43]
         x = self.conv_drop(F.max_pool2d(x, 3))
-        print('level 4.5:{}'.format(x.shape)) #[N, 64, 14, 14]
+        #print('level 4.5:{}'.format(x.shape)) #[N, 64, 14, 14]
         #3
         x = self.relu(self.conv5(x))
         x = self.relu(self.conv6(x))
-        print('level 6:{}'.format(x.shape)) #[N, 128, 14, 14]
+        #print('level 6:{}'.format(x.shape)) #[N, 128, 14, 14]
         x = self.conv_drop(F.max_pool2d(x, 3))
-        print('level 6.5:{}'.format(x.shape)) #[N, 128, 4, 4]
+        #print('level 6.5:{}'.format(x.shape)) #[N, 128, 4, 4]
         #4
-        '''
         x = self.relu(self.conv7(x))
         #print('level 7:{}'.format(x.shape)) #[N, 256, 4, 4]
         x = self.relu(self.conv8(x))
