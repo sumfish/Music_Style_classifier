@@ -20,24 +20,31 @@ config = {
 
     # file/path
     'dataset_path' : '../dataset/train',
+    'npy_path' : '../dataset/npy/train/data_3s',  ####different preprocessing
     'label_txt' : 'label.txt',
     'data_npy' : 'data.npy',
     'label_npy' : 'label.npy',
     'avg_npy' : 'avg.npy',
-    'std_npy' : 'std.npy'
+    'std_npy' : 'std.npy',
+    'visualize path':'/img'
 }
 print(config)
 
 def get_melspec(y, config):
     S = librosa.feature.melspectrogram(y, sr=config['sr'], n_fft=config['n_fft'], 
                                     hop_length=config['hop_length'], n_mels=config['n_mels'])
+    S = np.log(1+10000*S) #filter
+    #print(S.shape) #(128,T)
     return S
 
 def gen_normalize_file(audio_list):
     avg = np.mean(np.array([np.mean(x, axis=1) for x in audio_list]), axis=0)
-    std = np.mean(np.array([np.std(x, axis=1) for x in audio_list]), axis=0)
-    avg_file=os.path.join(config['dataset_path'],config['avg_npy'])
-    std_file=os.path.join(config['dataset_path'],config['std_npy'])
+    #test=np.array([np.std(x, axis=1) for x in audio_list])
+    #print(test[0].shape) #(128, )
+    #print(test.shape)#(the number of segment,128)
+    std = np.mean(np.array([np.std(x, axis=1) for x in audio_list]), axis=0) #(128, ) ###################
+    avg_file=os.path.join(config['npy_path'],config['avg_npy'])
+    std_file=os.path.join(config['npy_path'],config['std_npy'])
     np.save(avg_file, avg)
     np.save(std_file, std)
 
@@ -50,7 +57,7 @@ def audio2feature():
     paths = glob.glob(config['dataset_path']+'/*')
     for p in paths:
         print(p)
-        ''' 
+        '''
         #draw
         if(p.find('train\\04'))!=-1:
                 break
@@ -96,11 +103,13 @@ def audio2feature():
                 st_idx = next_idx
                 end_idx = st_idx + config['audio_samples_frame_size']
                 next_idx = st_idx + config['audio_samples_hop_length']
-        # draw_list.append(temp) #draw
-
+        '''
+        #draw
+        draw_list.append(temp) 
+        '''
     # save
-    data_name=os.path.join(config['dataset_path'],config['data_npy'])
-    label_name=os.path.join(config['dataset_path'],config['label_npy'])
+    data_name=os.path.join(config['npy_path'],config['data_npy'])
+    label_name=os.path.join(config['npy_path'],config['label_npy'])
     np.save(data_name,data_list)
     np.save(label_name,label_list)
 
@@ -115,6 +124,7 @@ def audio2feature():
     return draw_list
 
 def main():
+    mkdir(config['npy_path'])
     audio2feature()
     '''
     #draw
