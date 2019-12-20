@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import librosa
 import librosa.display
 import json
@@ -36,16 +37,17 @@ def draw(img_name, spec_list, config):
     plt.savefig(img_name, dpi='figure', bbox_inches='tight')
     plt.clf()
 
-def get_spectrogram(data, config, win_len=None):
-    ### get spectrogram according to the configuration and window_length
-    ### we first calculate the power2-spectrum,
-    ### and then get the Mel-spectrogram via the Mel-Filter banks
-    stft_matrix = librosa.stft(data, n_fft=config['n_fft'], hop_length=config['hop_length'], win_length=win_len)
-    mag_D = np.abs(stft_matrix)
-    pwr = mag_D**2
-    
-    mel_basis = librosa.filters.mel(sr=config['sr'], n_fft=config['n_fft'], n_mels=config['n_mels'])
-    mel_pwr = np.dot(mel_basis, pwr)
-    chk_NaN(mel_pwr)
-    # last, apply the gamma-power to approxiate Steven power law.
-    return power_to_outputType(mel_pwr, config)
+def load_npy(data_path):
+    data=np.load(data_path)
+    return data
+
+def read_data_minmax():
+    data=load_npy('../dataset/npy/train/data_1s_new/data.npy')
+    print(max(np.ravel(data)))
+    print(min(np.ravel(data)))
+
+def compute_mean_std():
+    data=load_npy('../dataset/npy/train/data_1s/data.npy')
+    pixels=np.ravel(data)
+    print('Data Mean:{}, Variance:{}'.format(np.mean(pixels),np.std(pixels)))
+    return np.mean(pixels), np.std(pixels)
