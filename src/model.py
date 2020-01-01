@@ -1,8 +1,9 @@
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
+from torchsummary import summary
 zsize=128
-num_classes =11
+num_classes =8
 
 ## each cnn is zero-padded
 class S2016_Model(torch.nn.Module):
@@ -67,23 +68,30 @@ class S2016_Model(torch.nn.Module):
 
 # frame-level paper
 class block(nn.Module):
-    def __init__(self, inp, out):
+    def __init__(self, inp, out, kernel):
         super(block, self).__init__()
+        if kernel==3:
+            last_kernel=1
+        else: 
+            last_kernel=5
         self.bn1 = nn.BatchNorm2d(inp)
-        self.conv1 = nn.Conv2d(inp, out, (3,1), padding=(1,0))
+        self.conv1 = nn.Conv2d(inp, out, (kernel,1), padding=(1,0))
         self.bn2 = nn.BatchNorm2d(out)
-        self.conv2 = nn.Conv2d(out, out, (3,1), padding=(1,0))
+        self.conv2 = nn.Conv2d(out, out, (kernel,1), padding=(1,0))
         self.bn3 = nn.BatchNorm2d(out)
-        self.up = nn.Conv2d(inp, out, (1,1), padding=(0,0))
+        self.up = nn.Conv2d(inp, out, (last_kernel,1), padding=(0,0))
     
     def forward(self, x):
+        #print('in')
         #print('block x:{}'.format(x.shape))  #shape(N,C,128,87)
         out = self.conv1(self.bn1(x)) #before is a cnn layer
+        #print('f(x):{}'.format(out.shape))
         out = self.conv2(F.relu(self.bn2(out)))
         out = self.bn3(out)
         #print('f(x):{}'.format(out.shape))
+        #print('f(x):{}'.format(self.up(x).shape))
         out += self.up(x) ##########################
-        #print('block x:{}'.format(self.up(x).shape))
+        #print('block x:{}'.format(out.shape))
         return out
 
 
@@ -98,15 +106,17 @@ class Encoder(nn.Module):
         
         self.head = nn.Sequential(
             #nn.BatchNorm2d(inp), ###############
-            nn.Conv2d(1, fre, (3,1), padding=(1,0)),
-            block(fre, fre*2),
+            #nn.Conv2d(1, fre, (3,1), padding=(1,0)),
+            nn.Conv2d(1, fre, (5,1), padding=(1,0)),
+            block(fre, fre*2, 5),
             nn.Dropout(p=0.25),
-            nn.MaxPool2d((3,1),(3,1)), #(42,87)
+            nn.MaxPool2d((3,1),(3,1)), #(42,T)
             
-            block(fre*2, fre*3),
+            block(fre*2, fre*3, 3),
             #nn.Dropout(p=0.3),
             nn.BatchNorm2d(fre*3),
             nn.ReLU(inplace=True),
+            #nn.MaxPool2d((3,1),(3,1)),
             #nn.Conv2d(fre*3, fre*2, (3,1), padding=(1,0))
         )
         
@@ -129,44 +139,96 @@ class Encoder(nn.Module):
         #x = x.view(-1, 192)
         x = torch.flatten(x, 1)
         #print('level 3:{}'.format(x.shape))
-        x = self.lin_drop(F.relu(self.fc1(x)))
+        last_layer = self.lin_drop(F.relu(self.fc1(x)))
         #print('level 4:{}'.format(x.shape))
-        x = F.softmax(self.fc2(x), dim=0) ####classifier
+        out = F.softmax(self.fc2(last_layer), dim=0) ####classifier
         #x = self.fc2(x) 
         #print('level 5:{}'.format(x.shape))
-        return x
+        return out, last_layer
 
 class Decoder(nn.Module):
     def __init__(self):
         super(Decoder,self).__init__()
-        self.dfc2 = nn.Linear(zsize, 2048)
-        #self.dfc1 = nn.Linear(2048,128*6*6)
-        self.dfc1 = nn.Linear(zsize,128*6*6)
+        ch=64
+        self.dfc2 = nn.Linear(zsize, 512)
+        self.dfc1 = nn.Linear(512,32*10*3)
+        #self.dfc1 = nn.Linear(512,ch*6*6) #64
+        #self.upsample1=nn.Upsample(size=(128,44),mode='bilinear') #(44)
+        #self.upsample2=nn.Upsample(size=(36,24),mode='bilinear') #(12,12)
+        self.upsample3=nn.Upsample(scale_factor=3)
+        #self.upsample3=nn.Upsample(size=(30,11))
+        self.upsample2=nn.Upsample(scale_factor=2)
         self.upsample1=nn.Upsample(scale_factor=2)
-        self.dconv3 = nn.ConvTranspose2d(128, 192, (3,1), stride = 2, padding = (1,0))
-        self.dconv2 = nn.ConvTranspose2d(192, 64, (3,1), stride = (3,1), padding = (2,0))
-        self.dconv1 = nn.ConvTranspose2d(64, 1, (3,1), stride = 1, padding = (4,1))
+        #self.dconv3 = nn.ConvTranspose2d(ch, ch*4, (3,1), stride = 2, padding = (1,0)) #192
+        #self.dconv2 = nn.ConvTranspose2d(ch*4, ch, (3,1), stride = (3,1), padding = (2,0))
+        #self.dconv1 = nn.ConvTranspose2d(ch, 1, (3,1), stride = 1, padding = (4,1))
+        self.bn1 = nn.BatchNorm2d(1)
+        self.bn2 = nn.BatchNorm2d(ch)
+        self.bn3 = nn.BatchNorm2d(ch*4)
+        self.conv_drop = nn.Dropout2d(p=0.2)
+        #self.con3=nn.Conv2d(ch, ch*4, (3,1), padding=(2,0))
+        #self.con2=nn.Conv2d(ch*4, ch, (3,1), padding=(1,0))
+        #self.con1=nn.Conv2d(ch, 1, (3,1), padding=(1,0))
+        self.con3=nn.Conv2d(ch, ch*4, 3, padding=(1,1))
+        self.con2=nn.Conv2d(ch*4, ch, 3, padding=(0,0))
+        self.con1=nn.Conv2d(ch, 1, 3, padding=(1,1))
+        self.head = nn.Sequential(
+            #nn.BatchNorm2d(inp), ###############
+            nn.Upsample(scale_factor=3),
+            nn.Conv2d(32, ch*3, 3, padding=(2,2)),
+            nn.Upsample(scale_factor=2),
+            block(ch*3, ch*2),
+            nn.Dropout(p=0.25),
+            #nn.MaxPool2d((3,1),(3,1)), #(42,87)
+            nn.Upsample(scale_factor=2),
+            block(ch*2, ch),
+            #nn.Dropout(p=0.3),
+            nn.BatchNorm2d(ch),
+            nn.ReLU(inplace=True),
+            
+            #nn.MaxPool2d((3,1),(3,1)),
+            #nn.Conv2d(fre*3, fre*2, (3,1), padding=(1,0))
+        )
 
+    
     def forward(self, x):
-        #x = F.relu(self.dfc2(x))
-        #('de level 1:{}'.format(x.shape))
+        x = F.relu(self.dfc2(x))
+        #print('de level 1:{}'.format(x.shape))
         x = F.relu(self.dfc1(x))
         #print('de level 2:{}'.format(x.size()))
-        x = x.view(x.size(0),128,6,6)
+        x = x.view(x.size(0),32,10,3)
         #print('de level 2.5:{}'.format(x.size()))
-        x=self.upsample1(x)
-        #print('de level 3:{}'.format(x.size()))
-        x = F.relu(self.dconv3(x))
-        #print('de level 5:{}'.format(x.size()))
-        x=self.upsample1(x)
-        #print('de level 6:{}'.format(x.size()))
-        x = self.dconv2(x)  
-        #print('de level 7:{}'.format(x.size()))
-        x = F.relu(x)
+        #print('original:{}'.format(x.shape))
+        x = self.head(x)
+        #print('de level 1:{}'.format(x.shape))
+        x = self.con1(x)
         #print('de level 8:{}'.format(x.size()))
-        x = self.dconv1(x)
-        #print('de level 9:{}'.format(x.size()))
+        #input()
+        '''
+        x = F.relu(self.dfc2(x))
+        #print('de level 1:{}'.format(x.shape))
+        x = F.relu(self.dfc1(x))
+        #print('de level 2:{}'.format(x.size()))
+        x = x.view(x.size(0),64,11,4)
+        #print('de level 2.5:{}'.format(x.size()))
+        x=self.upsample3(x)
+        #print('de level 3:{}'.format(x.size()))
+        #x = F.relu(self.bn3(self.dconv3(x)))
+        x = F.relu(self.bn3(self.con3(x)))
+        #print('de level 5:{}'.format(x.size()))
+        x=self.upsample2(x)
+        #print('de level 6:{}'.format(x.size()))
+        #x = F.relu(self.bn2(self.dconv2(x)))  
+        x = F.relu(self.bn2(self.con2(x)))
+        #print('de level 7:{}'.format(x.size()))
+        #x = self.dconv1(x)
+        x=self.upsample1(x)
+        x = self.bn1(self.con1(x))  ############################bn??????
+        #x = self.con1(x)
+        #print('de level 8:{}'.format(x.size()))
+        #input()
         #x = F.sigmoid(x)
+        '''
         return x
 
 class Autoencoder(nn.Module):
@@ -174,7 +236,7 @@ class Autoencoder(nn.Module):
         super(Autoencoder,self).__init__()
         self.encoder = enc
         self.decoder = dec
-        self.classifier = nn.Sequential(
+        self.classifier_layer = nn.Sequential(
             #nn.Linear(zsize,64),
             #nn.ReLU(inplace=True),
             #nn.Linear(64,num_classes),
@@ -183,13 +245,14 @@ class Autoencoder(nn.Module):
             )
     
     def forward(self,x):
+        #print(x.shape)
         x = self.encoder(x)
         x_re = self.decoder(x)
 
-        #x = self.classifier(x)
-        #x_c = F.softmax(x, dim=0)
-        #return x_c, x_re
-        return x_re
+        x = self.classifier_layer(x)
+        x_c = F.softmax(x, dim=0)
+        return x_c, x_re
+        #return x_re
 
 class Classifier(nn.Module):
     def __init__(self, enc):
@@ -212,8 +275,10 @@ class Classifier(nn.Module):
 '''
 de=Decoder()
 print(de)
-
-
-en=Encoder()
+'''
+'''
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+en=Encoder().to(device)
+summary(en,(1,128,44))
 print(en)
 '''

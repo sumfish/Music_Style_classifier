@@ -3,6 +3,7 @@ import numpy as np
 import librosa
 import librosa.display
 import json
+import random
 import matplotlib.pyplot as plt
 
 def list2txt(output_file,out_list):
@@ -41,13 +42,38 @@ def load_npy(data_path):
     data=np.load(data_path)
     return data
 
-def read_data_minmax():
-    data=load_npy('../dataset/npy/train/data_1s_new/data.npy')
+def read_data_minmax(data_path):
+    data=load_npy('../dataset/npy/train/'+data_path+'/data.npy')
     print(max(np.ravel(data)))
     print(min(np.ravel(data)))
 
-def compute_mean_std():
-    data=load_npy('../dataset/npy/train/data_1s/data.npy')
+def compute_mean_std(data_path):  ####train dataset
+    data=load_npy('../dataset/npy/train/'+data_path+'/data.npy')
     pixels=np.ravel(data)
     print('Data Mean:{}, Variance:{}'.format(np.mean(pixels),np.std(pixels)))
     return np.mean(pixels), np.std(pixels)
+
+## random sample 1000 data from npy.py/label.py
+def ran_sample_data2cluster(data_path):
+    number=2000
+    out_data_list=[]
+    out_label_list=[]
+    index_list=[]
+    data=load_npy('../dataset/npy'+data_path+'/data.npy')
+    label=load_npy('../dataset/npy'+data_path+'/label.npy')
+    #print(label)
+    #print(len(label))
+    for i in range(number):
+        r=random.randint(0,len(label)-1)
+        while index_list.count(r)!=0:
+            r=random.randint(0,len(label)-1)
+        index_list.append(r)
+        out_label_list.append(label[r])
+        out_data_list.append(data[r])
+    #print(len(out_data_list))
+    mkdir('../dataset/cluster_npy'+data_path)
+    print('create cluster data.....')
+    np.save('../dataset/cluster_npy'+data_path+'/data.npy',out_data_list)
+    np.save('../dataset/cluster_npy'+data_path+'/label.npy',out_label_list)
+
+

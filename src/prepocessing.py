@@ -2,25 +2,26 @@ import numpy as np
 import os 
 import glob
 import librosa
-from utils import mkdir, list2txt, draw
+from utils import *
 
 ### settings
 config = {
     # basic parameters
     'sr': 22050,
-    'n_fft': 1024, # window size
+    'n_fft': 1024, # window size     #remy2048,512 #suli 2048,256
     'hop_length': 512,
     
     # mels
     'n_mels': 128,
 
     # for slicing and overlapping (now is no overlapping)
-    'audio_samples_frame_size': 66150, # 3sec * sr
-    'audio_samples_hop_length': 66150,
+    'audio_samples_frame_size': 22050, # sec * sr
+    'audio_samples_hop_length': 22050,
 
     # file/path
-    'dataset_path' : '../dataset/train',
-    'npy_path' : '../dataset/npy/train/data_3s',  ####different preprocessing
+    # change path for test/training data
+    'dataset_path' : '../dataset/test',
+    'npy_path' : '../dataset/npy/test/data_1s_ver2',  ####different preprocessing
     'label_txt' : 'label.txt',
     'data_npy' : 'data.npy',
     'label_npy' : 'label.npy',
@@ -36,17 +37,6 @@ def get_melspec(y, config):
     S = np.log(1+10000*S) #filter
     #print(S.shape) #(128,T)
     return S
-
-def gen_normalize_file(audio_list):
-    avg = np.mean(np.array([np.mean(x, axis=1) for x in audio_list]), axis=0)
-    #test=np.array([np.std(x, axis=1) for x in audio_list])
-    #print(test[0].shape) #(128, )
-    #print(test.shape)#(the number of segment,128)
-    std = np.mean(np.array([np.std(x, axis=1) for x in audio_list]), axis=0) #(128, ) ###################
-    avg_file=os.path.join(config['npy_path'],config['avg_npy'])
-    std_file=os.path.join(config['npy_path'],config['std_npy'])
-    np.save(avg_file, avg)
-    np.save(std_file, std)
 
 def audio2feature():
     data_list = []
@@ -66,6 +56,10 @@ def audio2feature():
         files = glob.glob(p+'/*.mp3')
         for filename in files:
             print(filename)
+            '''
+            if(filename.find('04.mp3'))!=-1:
+                break
+            '''
             #mkdir(filename[:-4]) # dir for instrument of the song
             instru_class = filename[-6:-4] #class label
             y, sr = librosa.core.load(filename, offset=1.0, sr=config['sr']) # read after 1 seconds #mono=True(convert signal to mono)
@@ -112,10 +106,6 @@ def audio2feature():
     label_name=os.path.join(config['npy_path'],config['label_npy'])
     np.save(data_name,data_list)
     np.save(label_name,label_list)
-
-    # std & avg data
-    print('Generate std/avg data....')
-    gen_normalize_file(data_list)
     
     np.save('draw.npy',draw_list)
     #list2txt(config['label_txt'],label)
@@ -124,8 +114,15 @@ def audio2feature():
     return draw_list
 
 def main():
-    mkdir(config['npy_path'])
-    audio2feature()
+    
+    #mkdir(config['npy_path'])
+    #audio2feature()
+
+    
+    #### generate cluster data
+    ran_sample_data2cluster('/train/data_1s')
+    
+    
     '''
     #draw
     compare=np.load('draw.npy')
@@ -134,3 +131,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

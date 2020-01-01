@@ -5,7 +5,8 @@ from torchvision import datasets, transforms
 from torch import Tensor
 from utils import *
 
-npy_dir='../dataset/npy/'
+npy_dir='../dataset/'
+#npy_dir='../dataset/cluster_npy/'   #########draw cluster
 
 class Style_Dataset(Dataset):
     def __init__(self, path, audio_data, label_data, transform=None):
