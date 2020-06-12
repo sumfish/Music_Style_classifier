@@ -2,8 +2,8 @@ import torch.nn as nn
 import torch
 import torch.nn.functional as F
 from torchsummary import summary
-zsize=128
-num_classes =8
+zsize=64
+num_classes =4
 
 ## each cnn is zero-padded
 class S2016_Model(torch.nn.Module):
@@ -67,9 +67,9 @@ class S2016_Model(torch.nn.Module):
         return x
 
 # frame-level paper
-class block(nn.Module):
+class res_block2d(nn.Module):
     def __init__(self, inp, out, kernel):
-        super(block, self).__init__()
+        super(res_block2d, self).__init__()
         if kernel==3:
             last_kernel=1
         else: 
@@ -100,6 +100,7 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
         fre = 64
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.conv = nn.Conv2d(1, fre, (5,1), padding=(1,0))
         self.fc1 = nn.Linear(fre*3, zsize)
         self.fc2 = nn.Linear(zsize, num_classes)
         self.lin_drop = nn.Dropout(p=0.5)
@@ -107,12 +108,11 @@ class Encoder(nn.Module):
         self.head = nn.Sequential(
             #nn.BatchNorm2d(inp), ###############
             #nn.Conv2d(1, fre, (3,1), padding=(1,0)),
-            nn.Conv2d(1, fre, (5,1), padding=(1,0)),
-            block(fre, fre*2, 5),
+            res_block2d(fre, fre*2, 5),
             nn.Dropout(p=0.25),
             nn.MaxPool2d((3,1),(3,1)), #(42,T)
             
-            block(fre*2, fre*3, 3),
+            res_block2d(fre*2, fre*3, 3),
             #nn.Dropout(p=0.3),
             nn.BatchNorm2d(fre*3),
             nn.ReLU(inplace=True),
@@ -131,16 +131,19 @@ class Encoder(nn.Module):
         level 5:torch.Size([16, 11])
         '''
         x = _input
-        #print('original:{}'.format(x.shape))
+        print('original:{}'.format(x.shape))
+        x = self.conv(x)
+        print('original:{}'.format(x.shape))
         x = self.head(x)
-        #print('level 1(after res):{}'.format(x.shape))
+        print('level 1(after res):{}'.format(x.shape))
         x = self.avgpool(x)
-        #print('level 2:{}'.format(x.shape))
+        print('level 2:{}'.format(x.shape))
         #x = x.view(-1, 192)
         x = torch.flatten(x, 1)
-        #print('level 3:{}'.format(x.shape))
+        print('level 3:{}'.format(x.shape))
         last_layer = self.lin_drop(F.relu(self.fc1(x)))
-        #print('level 4:{}'.format(x.shape))
+        print('level 4:{}'.format(x.shape))
+        input()
         out = F.softmax(self.fc2(last_layer), dim=0) ####classifier
         #x = self.fc2(x) 
         #print('level 5:{}'.format(x.shape))

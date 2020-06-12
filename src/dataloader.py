@@ -5,7 +5,7 @@ from torchvision import datasets, transforms
 from torch import Tensor
 from utils import *
 
-npy_dir='../dataset/'
+npy_dir='../datasets/npy_txt/'
 #npy_dir='../dataset/cluster_npy/'   #########draw cluster
 
 class Style_Dataset(Dataset):
@@ -25,7 +25,7 @@ class Style_Dataset(Dataset):
         else:
             audio=Tensor(audio).view(1,audio.shape[0],audio.shape[1])
         #print(audio.shape) # torch.Size([1, 128, 130])
-        classifi=int(self.label[index]) #'01'->1
+        classifi=int(self.label[index][1]) #'01'->1
         return [audio,classifi]
 
     def __len__(self):
@@ -48,4 +48,13 @@ img_transform=transforms.Compose([
 # train & validation dataset
 print(Style_Dataset('train/data_1s/','data.npy','label.npy', transform = img_transform).__getitem__(600))
 print(Style_Dataset('train/data_1s/','data.npy','label.npy').__getitem__(600))
+'''
+
+
+
+'''
+viz.line(X=np.column_stack((np.array(time_point),np.array(time_point))),
+       Y=np.column_stack((np.array(loss_point),np.array(accuracy_point))),
+       win=line,
+       opts=dict(legend=["loss", "accuracy"]))
 '''
